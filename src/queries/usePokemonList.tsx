@@ -1,10 +1,17 @@
-import { useQuery, UseQueryOptions } from "@tanstack/react-query";
-import { Pokemon, PokemonListResponse } from "@/types/pokemon";
+import { useQuery } from "@tanstack/react-query";
+import { PokemonListResponse, PaginatedPokemonResponse } from "@/types/pokemon";
+import { transformPokemonResponse } from "@/util/transformPokemonResponse";
+import { getPokemonByType } from "./usePokemonByType";
 
 export const getPokemonList = async (
   currentPage: number,
-  limit: number
-): Promise<{ pokemon: Pokemon[]; totalPages: number }> => {
+  limit: number,
+  filterType: string | null
+): Promise<PaginatedPokemonResponse | null> => {
+  if (filterType) {
+    return getPokemonByType(filterType, currentPage);
+  }
+
   const offset = (currentPage - 1) * limit;
   const response = await fetch(
     `https://pokeapi.co/api/v2/pokemon?offset=${offset}&limit=${limit}`
@@ -16,14 +23,7 @@ export const getPokemonList = async (
     data.results.map(async (pokemon) => {
       const res = await fetch(pokemon.url);
       const details = await res.json();
-      return {
-        id: details.id,
-        name: details.name,
-        imageUrl: details.sprites.other["official-artwork"].front_default,
-        types: details.types.map(
-          (type: { type: { name: string } }) => type.type.name
-        ),
-      };
+      return transformPokemonResponse(details);
     })
   );
 
@@ -36,11 +36,11 @@ export const getPokemonList = async (
 export function usePokemonList(
   currentPage: number,
   limit: number,
-  options?: UseQueryOptions
+  filterType: string | null
 ) {
-  return useQuery({
-    queryKey: ["pokemon", currentPage],
-    queryFn: async () => getPokemonList(currentPage, limit),
-    ...options,
+  return useQuery<PaginatedPokemonResponse | null>({
+    queryKey: ["pokemon", currentPage, filterType],
+    queryFn: async () => getPokemonList(currentPage, limit, filterType),
+    initialData: null,
   });
 }
